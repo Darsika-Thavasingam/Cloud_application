@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: Serverless Todo App
+
+Globals:
+  Function:
+    Runtime: nodejs20.x
+    Timeout: 10
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref TodosTable
+
+Resources:
+
+  TodosTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: Todos
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+
+  GetTodosFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: getTodos
+      Handler: getTodos.handler
+      CodeUri: lambda/
+      Policies:
+        - DynamoDBReadPolicy:
+            TableName: !Ref TodosTable
+      Events:
+        GetTodos:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TodoApi
+            Path: /todos
+            Method: GET
+
+  CreateTodoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: createTodo
+      Handler: createTodo.handler
+      CodeUri: lambda/
+      Policies:
+        - DynamoDBWritePolicy:
+            TableName: !Ref TodosTable
+      Events:
+        CreateTodo:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TodoApi
+            Path: /todos
+            Method: POST
+
+  DeleteTodoFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: deleteTodo
+      Handler: deleteTodo.handler
+      CodeUri: lambda/
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TodosTable
+      Events:
+        DeleteTodo:
+          Type: Api
+          Properties:
+            RestApiId: !Ref TodoApi
+            Path: /todos/{id}
+            Method: DELETE
+
+  TodoApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      Name: TodoApi
+      StageName: prod
+      Cors:
+        AllowOrigin: "'*'"
+        AllowHeaders: "'Content-Type'"
+        AllowMethods: "'GET,POST,DELETE,OPTIONS'"
+
+Outputs:
+  ApiUrl:
+    Description: "Base URL for the Todo API"
+    Value: !Sub "https://${TodoApi}.execute-api.${AWS::Region}.amazonaws.com/prod"

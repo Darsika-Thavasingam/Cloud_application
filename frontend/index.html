@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>TASKR — Serverless Todo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0d0d0d; --surface: #161616; --border: #2a2a2a;
+      --accent: #e8ff47; --accent2: #ff6b35; --text: #f0f0f0; --muted: #666;
+    }
+    body {
+      background: var(--bg); color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; padding: 48px 16px 80px;
+    }
+    header { width: 100%; max-width: 620px; margin-bottom: 40px; }
+    .logo { font-family: 'Bebas Neue', sans-serif; font-size: 88px; letter-spacing: 4px; line-height: 1; }
+    .logo span { color: var(--accent); }
+    .tagline { font-size: 13px; letter-spacing: 3px; text-transform: uppercase; color: var(--muted); margin-top: 4px; }
+    .api-config {
+      width: 100%; max-width: 620px; background: var(--surface);
+      border: 1px solid var(--border); border-left: 3px solid var(--accent);
+      border-radius: 8px; padding: 14px 18px; margin-bottom: 28px;
+      display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    }
+    .api-config label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--accent); white-space: nowrap; }
+    .api-config input {
+      flex: 1; min-width: 220px; background: transparent; border: none;
+      border-bottom: 1px solid var(--border); color: var(--text);
+      font-family: 'DM Sans', sans-serif; font-size: 13px; padding: 4px 0; outline: none;
+    }
+    .api-config input:focus { border-color: var(--accent); }
+    .api-config input::placeholder { color: var(--muted); }
+    .input-row { width: 100%; max-width: 620px; display: flex; gap: 12px; margin-bottom: 32px; }
+    .task-input {
+      flex: 1; background: var(--surface); border: 1px solid var(--border);
+      border-radius: 8px; color: var(--text); font-family: 'DM Sans', sans-serif;
+      font-size: 15px; padding: 14px 18px; outline: none;
+    }
+    .task-input:focus { border-color: var(--accent); }
+    .task-input::placeholder { color: var(--muted); }
+    .add-btn {
+      background: var(--accent); color: #0d0d0d; border: none; border-radius: 8px;
+      font-family: 'Bebas Neue', sans-serif; font-size: 18px; letter-spacing: 2px;
+      padding: 0 28px; cursor: pointer; transition: transform 0.15s;
+    }
+    .add-btn:hover { background: #d4ea2b; transform: translateY(-1px); }
+    .add-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .stats { width: 100%; max-width: 620px; display: flex; gap: 24px; margin-bottom: 20px; }
+    .stat { display: flex; flex-direction: column; gap: 2px; }
+    .stat-num { font-family: 'Bebas Neue', sans-serif; font-size: 28px; line-height: 1; color: var(--accent); }
+    .stat-label { font-size: 11px; letter-spacing: 2px; text-transform: uppercase; color: var(--muted); }
+    .todo-list { width: 100%; max-width: 620px; display: flex; flex-direction: column; gap: 10px; }
+    .todo-item {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 10px; padding: 16px 18px; display: flex; align-items: center; gap: 14px;
+      animation: slideIn 0.3s ease both;
+    }
+    .todo-item.removing { opacity: 0; transform: translateX(20px); transition: opacity 0.25s, transform 0.25s; }
+    .check-btn {
+      width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--border);
+      background: transparent; cursor: pointer; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .check-btn.checked { background: var(--accent); border-color: var(--accent); }
+    .check-btn.checked::after {
+      content: ''; width: 6px; height: 10px;
+      border: 2px solid #0d0d0d; border-top: none; border-left: none;
+      transform: rotate(45deg) translateY(-1px);
+    }
+    .todo-title { flex: 1; font-size: 15px; }
+    .todo-item.done .todo-title { color: var(--muted); text-decoration: line-through; }
+    .todo-meta { font-size: 11px; color: var(--muted); white-space: nowrap; }
+    .del-btn {
+      background: transparent; border: none; color: var(--muted);
+      cursor: pointer; font-size: 18px; padding: 4px; border-radius: 4px;
+    }
+    .del-btn:hover { color: var(--accent2); }
+    .empty { text-align: center; padding: 60px 0; color: var(--muted); }
+    .empty-icon { font-size: 40px; margin-bottom: 12px; }
+    .toast {
+      position: fixed; bottom: 32px; left: 50%;
+      transform: translateX(-50%) translateY(20px);
+      background: var(--surface); border: 1px solid var(--border);
+      border-left: 3px solid var(--accent2); color: var(--text);
+      padding: 12px 20px; border-radius: 8px; font-size: 13px;
+      opacity: 0; transition: opacity 0.25s, transform 0.25s; pointer-events: none; z-index: 999;
+    }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+    .toast.success { border-left-color: var(--accent); }
+    .spinner {
+      width: 20px; height: 20px; border: 2px solid var(--border);
+      border-top-color: var(--accent); border-radius: 50%;
+      animation: spin 0.7s linear infinite; margin: 40px auto;
+    }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">TASK<span>R</span></div>
+    <div class="tagline">Serverless · AWS Lambda · DynamoDB</div>
+  </header>
+  <div class="api-config">
+    <label>API URL</label>
+    <input id="apiUrl" type="text" placeholder="https://xxxxxxxx.execute-api.us-east-1.amazonaws.com/prod" value=""/>
+  </div>
+  <div class="input-row">
+    <input class="task-input" id="taskInput" type="text" placeholder="What needs to be done?" maxlength="200"/>
+    <button class="add-btn" id="addBtn" onclick="createTodo()">ADD</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-num" id="totalCount">0</div><div class="stat-label">Total</div></div>
+    <div class="stat"><div class="stat-num" id="doneCount">0</div><div class="stat-label">Done</div></div>
+    <div class="stat"><div class="stat-num" id="pendingCount">0</div><div class="stat-label">Pending</div></div>
+  </div>
+  <div class="todo-list" id="todoList"><div class="spinner"></div></div>
+  <div class="toast" id="toast"></div>
+  <script>
+    let todos = [];
+    function apiBase() { return document.getElementById('apiUrl').value.trim().replace(/\/$/, '') || null; }
+    async function fetchTodos() {
+      const base = apiBase();
+      if (!base) { renderTodos([]); return; }
+      try {
+        const res = await fetch(`${base}/todos`);
+        const data = await res.json();
+        todos = data.todos || [];
+        renderTodos(todos);
+      } catch (e) { showToast('Could not reach API', false); renderTodos([]); }
+    }
+    async function createTodo() {
+      const input = document.getElementById('taskInput');
+      const title = input.value.trim();
+      if (!title) { input.focus(); return; }
+      const base = apiBase();
+      if (!base) { showToast('Paste your API URL first', false); return; }
+      document.getElementById('addBtn').disabled = true;
+      try {
+        const res = await fetch(`${base}/todos`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title }),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error);
+        todos.unshift(data.todo);
+        input.value = '';
+        renderTodos(todos);
+        showToast('Task added!', true);
+      } catch (e) { showToast(e.message || 'Failed to add task', false); }
+      finally { document.getElementById('addBtn').disabled = false; }
+    }
+    async function deleteTodo(id) {
+      const base = apiBase();
+      if (!base) return;
+      const el = document.getElementById(`todo-${id}`);
+      if (el) el.classList.add('removing');
+      await new Promise(r => setTimeout(r, 260));
+      try {
+        await fetch(`${base}/todos/${id}`, { method: 'DELETE' });
+        todos = todos.filter(t => t.id !== id);
+        renderTodos(todos);
+        showToast('Task removed', true);
+      } catch { showToast('Delete failed', false); }
+    }
+    function toggleDone(id) {
+      todos = todos.map(t => t.id === id ? { ...t, completed: !t.completed } : t);
+      renderTodos(todos);
+    }
+    function renderTodos(list) {
+      const el = document.getElementById('todoList');
+      const done = list.filter(t => t.completed).length;
+      document.getElementById('totalCount').textContent = list.length;
+      document.getElementById('doneCount').textContent = done;
+      document.getElementById('pendingCount').textContent = list.length - done;
+      if (list.length === 0) {
+        el.innerHTML = `<div class="empty"><div class="empty-icon">✦</div><div>No tasks yet — add one above</div></div>`;
+        return;
+      }
+      el.innerHTML = list.map((t, i) => `
+        <div class="todo-item ${t.completed ? 'done' : ''}" id="todo-${t.id}" style="animation-delay:${i * 0.04}s">
+          <button class="check-btn ${t.completed ? 'checked' : ''}" onclick="toggleDone('${t.id}')"></button>
+          <span class="todo-title">${t.title.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>
+          <span class="todo-meta">${t.createdAt ? new Date(t.createdAt).toLocaleDateString('en-US',{month:'short',day:'numeric'}) : ''}</span>
+          <button class="del-btn" onclick="deleteTodo('${t.id}')">×</button>
+        </div>`).join('');
+    }
+    function showToast(msg, success = true) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show' + (success ? ' success' : '');
+      clearTimeout(t._timer);
+      t._timer = setTimeout(() => t.classList.remove('show'), 3000);
+    }
+    document.getElementById('taskInput').addEventListener('keydown', e => { if (e.key === 'Enter') createTodo(); });
+    document.getElementById('apiUrl').addEventListener('change', fetchTodos);
+    fetchTodos();
+  </script>
+</body>
+</html>
